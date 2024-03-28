@@ -174,6 +174,30 @@ class JoinRelationshipTest extends TestCase
     }
 
     /** @test */
+    public function test_apply_condition_to_join_using_custom_eloquent_builder_model_method()
+    {
+        $queryBuilder = User::query()->joinRelationship('posts', function ($join) {
+            // whereReviewed() is an method of the custom in the PostBuilder builder in the Post model
+            $join->whereReviewed();
+        });
+
+        $query = $queryBuilder->toSql();
+
+        // running to make sure it doesn't throw any exceptions
+        $queryBuilder->get();
+
+        $this->assertStringContainsString(
+            'inner join "posts" on "posts"."user_id" = "users"."id"',
+            $query
+        );
+
+        $this->assertStringContainsString(
+            'and "reviewed" = ?',
+            $query
+        );
+    }
+
+    /** @test */
     public function test_apply_condition_to_nested_joins()
     {
         $queryBuilder = User::query()->joinRelationship('posts.comments', [
@@ -537,8 +561,8 @@ class JoinRelationshipTest extends TestCase
     {
         $query = User::joinRelationship('commentsThroughPosts.user', [
             'commentsThroughPosts' => [
-                'posts' => fn($join) => $join->as('posts_alias'),
-                'comments' => fn($join) => $join->as('comments_alias'),
+                'posts' => fn ($join) => $join->as('posts_alias'),
+                'comments' => fn ($join) => $join->as('comments_alias'),
             ],
         ])->toSql();
 
@@ -558,8 +582,8 @@ class JoinRelationshipTest extends TestCase
     {
         $query = Group::joinRelationship('posts.user', [
             'posts' => [
-                'posts' => fn($join) => $join->as('posts_alias'),
-                'post_groups' => fn($join) => $join->as('post_groups_alias'),
+                'posts' => fn ($join) => $join->as('posts_alias'),
+                'post_groups' => fn ($join) => $join->as('post_groups_alias'),
             ],
         ])->toSql();
 
@@ -570,6 +594,27 @@ class JoinRelationshipTest extends TestCase
 
         $this->assertStringContainsString(
             'inner join "post_groups" as "post_groups_alias"',
+            $query
+        );
+    }
+
+    /** @test */
+    public function test_join_belongs_to_many_with_alias()
+    {
+        $query = Group::joinRelationship('posts', [
+            'posts' => [
+                'posts' => fn ($join) => $join->as('posts_alias'),
+                'post_groups' => fn ($join) => $join->as('post_groups_not_nested'),
+            ],
+        ])->toSql();
+
+        $this->assertStringContainsString(
+            'inner join "posts" as "posts_alias"',
+            $query
+        );
+
+        $this->assertStringContainsString(
+            'inner join "post_groups" as "post_groups_not_nested"',
             $query
         );
     }
